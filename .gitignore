@@ -1,0 +1,6 @@
+*.pyc
+*.egg-info
+.vscode
+.DS_Store
+*.prof
+/logs
