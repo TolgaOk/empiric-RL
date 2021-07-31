@@ -7,8 +7,8 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3 import A2C
 
 from configs import all_configs
-from empiric_rl.common import log_weighted_average_score
-from empiric_rl.sb3 import SB3Experiment
+from empiric_rl.utils import log_weighted_average_score
+from empiric_rl.trainers.sb3_trainer import SB3Experiment
 
 
 class A2CExperiment(SB3Experiment):
@@ -55,7 +55,7 @@ class A2CExperiment(SB3Experiment):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stable Baselines 3 A2C")
-    A2CExperiment.common_parse_arguments(parser)
+    A2CExperiment.add_parse_arguments(parser)
 
     args = parser.parse_args()
     args = vars(args)

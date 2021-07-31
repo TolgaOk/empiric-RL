@@ -1,14 +1,14 @@
 import torch
 import optuna
 
-from empiric_rl.modules.torch.sb3_module import SB3DenseActorCritic
+from empiric_rl.modules.torch.mb_modules import MBDenseActorCritic
 from empiric_rl.utils import HyperParameter
 from empiric_rl.trainers.sb3_trainer import SB3Config
 from empiric_rl.trainers.base_trainer import TunerInfo
 
 
 LunarLanderConfig = SB3Config(
-    policy=SB3DenseActorCritic,
+    policy=MBDenseActorCritic,
     hyperparameters=dict(
         lr=HyperParameter(
             default=3e-4,

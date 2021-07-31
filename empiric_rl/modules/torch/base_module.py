@@ -1,7 +1,7 @@
-from typing import Union, List, Callable, Optional, Tuple
+from abc import abstractmethod, ABC
+from typing import Union, List, Optional
 import torch
 from gym.spaces import Box, Discrete
-from stable_baselines3.common.type_aliases import Schedule
 
 
 class DenseNet(torch.nn.Module):
@@ -11,6 +11,15 @@ class DenseNet(torch.nn.Module):
                  output_size: int,
                  hidden_widths: List[int],
                  activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU) -> None:
+        """ Fully Connected Network
+
+        Args:
+            input_size (int): Size of the input features
+            output_size (int): Size of the output features
+            hidden_widths (List[int]): List of hidden neurons
+            activation_fn (Optional[torch.nn.Module], optional): Activation module. Defaults to 
+                torch.nn.ReLU.
+        """
         super().__init__()
         module_list = []
         for width in hidden_widths:
@@ -24,13 +33,12 @@ class DenseNet(torch.nn.Module):
         return self.network(input_tensor)
 
 
-class DenseActorCritic(torch.nn.Module):
+class BaseDenseActorCritic(torch.nn.Module, ABC):
 
     def __init__(self,
                  observation_space: Box,
                  action_space: Union[Box,  Discrete],
-                 lr_schduler: Schedule,
-                 use_sde: bool,
+                 lr: float,
                  pi_layer_widths: List[int],
                  value_layer_widths: List[int],
                  pi_activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU,
@@ -50,34 +58,22 @@ class DenseActorCritic(torch.nn.Module):
         self.pi_network = DenseNet(self.input_size, self.pi_out_size,
                                    pi_layer_widths, pi_activation_fn)
         self.value_network = DenseNet(self.input_size, 1, value_layer_widths, value_activation_fn)
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=lr_schduler(1))
+        self._optimizer = torch.optim.Adam(self.parameters(), lr=lr)
 
-    def forward(self, observation: torch.Tensor
-                ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        pi_logits = self.pi_network(observation)
-        pi_dist = self.get_dist(logits=pi_logits)
-        value = self.value_network(observation)
-        action = pi_dist.sample()
-        log_prob = pi_dist.log_prob(action)
-        return action, value, log_prob
+    @property
+    def optimizer(self):
+        return self._optimizer
 
-    def evaluate_actions(self,
-                         observation: torch.Tensor,
-                         action: torch.Tensor
-                         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        pi_logits = self.pi_network(observation)
-        pi_dist = self.get_dist(logits=pi_logits)
-        value = self.value_network(observation)
-        log_prob = pi_dist.log_prob(action)
-        entropy = pi_dist.entropy()
-        return value, log_prob, entropy
+    @abstractmethod
+    def forward(self, observation: torch.Tensor):
+        pass
 
     def get_dist(self, logits):
         if isinstance(self.action_space, Discrete):
             return torch.distributions.Categorical(logits=logits)
         if isinstance(self.action_space, Box):
             mean_logits, std_logits = logits.split(logits.shape[-1]//2, dim=-1)
-            std = torch.nn.functional.softplus(std_logits)
+            std = torch.nn.functional.softplus(std_logits) + 0.05
             return torch.distributions.Independent(
                 torch.distributions.Normal(loc=mean_logits, scale=std_logits),
                 reinterpreted_batch_ndims=-1)
