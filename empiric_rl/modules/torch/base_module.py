@@ -60,6 +60,9 @@ class BaseDenseActorCritic(torch.nn.Module, ABC):
         self.value_network = DenseNet(self.input_size, 1, value_layer_widths, value_activation_fn)
         self._optimizer = torch.optim.Adam(self.parameters(), lr=lr)
 
+        # Last action Layer Initialization
+        self.pi_network.network[-1].apply(lambda layer: layer.weight.data.div_(100))
+
     @property
     def optimizer(self):
         return self._optimizer
@@ -73,9 +76,9 @@ class BaseDenseActorCritic(torch.nn.Module, ABC):
             return torch.distributions.Categorical(logits=logits)
         if isinstance(self.action_space, Box):
             mean_logits, std_logits = logits.split(logits.shape[-1]//2, dim=-1)
-            std = torch.nn.functional.softplus(std_logits) + 0.05
+            std = torch.nn.functional.softplus(std_logits) + 0.1
             return torch.distributions.Independent(
-                torch.distributions.Normal(loc=mean_logits, scale=std_logits),
+                torch.distributions.Normal(loc=mean_logits, scale=std),
                 reinterpreted_batch_ndims=-1)
         else:
             raise NotImplementedError("Unsupported action space: {}".format(self.action_space))

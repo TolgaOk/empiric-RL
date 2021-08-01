@@ -8,7 +8,8 @@ import optuna
 
 class HyperParameter(NamedTuple):
     default: Any
-    tune_fn: Optional[Callable]
+    tune_fn: Optional[Callable] = None
+    interpret: Optional[Callable] = None
 
 
 def apply_wrappers(environment: gym.Env, wrappers: List[gym.Wrapper]) -> gym.Env:
@@ -23,10 +24,7 @@ def realize_hyperparameter(collection: Dict[str, Union[Dict[str, HyperParameter]
     realized_collection = dict()
     for name, value in collection.items():
         if isinstance(value, HyperParameter):
-            if trial is None:
-                realization = value.default
-            else:
-                realization = value.default if value.tune_fn is None else value.tune_fn(trial)
+            realization = _realize_value(value, trial)
         elif isinstance(value, dict):
             realization = realize_hyperparameter(value, trial)
         else:
@@ -34,6 +32,15 @@ def realize_hyperparameter(collection: Dict[str, Union[Dict[str, HyperParameter]
         realized_collection[name] = realization
     return realized_collection
 
+
+def _realize_value(value: HyperParameter, trial: optuna.Trial):
+    if trial is None:
+        return value.default
+    if value.tune_fn is None:
+        return value.default
+    if value.interpret is not None:
+        return value.interpret(value.tune_fn(trial))
+    return value.tune_fn(trial)
 
 def auto_file_name(dir_path: str, name: str, suffix=""):
     path = os.path.join(dir_path, name + suffix)

@@ -49,7 +49,9 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
             torch.cat([observation, last_next_obseration.unsqueeze(1)], dim=1)
         )
         values, last_value = concat_values[:, :-1], concat_values[:, -1]
-        log_probs = pi_dist.log_prob(action.squeeze(-1)).unsqueeze(-1)
+        if len(action.shape) != len(observation.shape):
+            action = action.unsqueeze(-1)
+        log_probs = pi_dist.log_prob(action).unsqueeze(-1)
         entropies = pi_dist.entropy().unsqueeze(-1)
         return values, log_probs, entropies, last_value
 
@@ -64,5 +66,7 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
         observation = torch.from_numpy(observation).to(self.device)
         pi_logits = self.pi_network(observation)
         pi_dist = self.get_dist(logits=pi_logits)
-        action = pi_dist.sample().unsqueeze(-1)
+        action = pi_dist.sample()
+        if len(action.shape) != len(observation.shape):
+            action = action.unsqueeze(-1)
         return action.cpu().numpy(), None, {}

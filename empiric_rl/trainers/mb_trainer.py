@@ -34,7 +34,7 @@ class MBExperiment(BaseExperiment):
         hyperparameters = realize_hyperparameter(self.config.hyperparameters, trial=trial)
         vecenv = make_vec_env(
             lambda: apply_wrappers(self.make_env(), self.config.gym_wrappers),
-            n_envs=self.cl_args["n_envs"],
+            n_envs=hyperparameters["n_envs"],
             seed=self.cl_args["seed"],
             vec_env_cls=SubprocVecEnv)
         vecenv = apply_wrappers(vecenv, self.config.sb3_wrappers)
@@ -58,7 +58,5 @@ class MBExperiment(BaseExperiment):
         BaseExperiment.add_parse_arguments(parser)
         parser.add_argument("--seed", type=int, default=None,
                             help="Global seed")
-        parser.add_argument("--n-envs", type=int, default=8,
-                            help="Number of parallel environments")
         parser.add_argument("--device", type=str, default="cpu",
                             help="Torch device")
