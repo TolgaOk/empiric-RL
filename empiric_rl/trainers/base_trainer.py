@@ -3,10 +3,18 @@ from typing import List, Any, Dict, Union, Optional, Union
 from dataclasses import dataclass
 import os
 import argparse
+import numpy as np
 import optuna
 import gym
 
-from empiric_rl.utils import HyperParameter, make_run_dir
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
+
+from empiric_rl.utils import (HyperParameter,
+                              realize_hyperparameter,
+                              apply_wrappers,
+                              make_run_dir)
 
 
 @dataclass
@@ -49,8 +57,35 @@ class BaseExperiment(ABC):
             return self.tune()
         return self.setup()
 
+    @staticmethod
+    def make_seed(seed, trial):
+        seed = seed if seed is not None else np.random.randint(0, 2**20)
+        if trial is not None:
+            seed = seed + 1000 * trial.number
+        return seed
+
     def make_env(self):
         return gym.make(self.cl_args["env_name"])
+
+    def setup(self, trial: Optional[optuna.Trial] = None) -> float:
+        hyperparameters = realize_hyperparameter(self.config.hyperparameters, trial=trial)
+        seed = self.make_seed(self.cl_args["seed"], trial)
+        vecenv = make_vec_env(
+            lambda: apply_wrappers(self.make_env(), self.config.gym_wrappers),
+            n_envs=hyperparameters["n_envs"],
+            seed=seed,
+            vec_env_cls=SubprocVecEnv)
+        vecenv = apply_wrappers(vecenv, self.config.sb3_wrappers)
+
+        log_dir = make_run_dir(self.main_dir, self.exp_name)
+        logger = configure(log_dir, ["stdout", "json", "tensorboard", "csv"])
+
+        agent, score = self._setup(hyperparameters, vecenv, logger, seed)
+
+        if self.cl_args["save_model"]:
+            agent.save(log_dir)
+
+        return score
 
     def tune(self) -> None:
         storage_url = "".join(("sqlite:///", os.path.join(self.main_dir, "store.db")))

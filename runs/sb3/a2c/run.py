@@ -15,9 +15,9 @@ class A2CExperiment(SB3Experiment):
 
     def _setup(self,
                hyperparameters: Dict[Union[Dict[str, Any]], Any],
-               logger: Logger,
                vecenv: VecEnv,
-               log_dir: str
+               logger: Logger,
+               seed: int
                ) -> Tuple[BaseAlgorithm, float]:
         agent = A2C(
             policy=self.config.policy,
@@ -32,25 +32,26 @@ class A2CExperiment(SB3Experiment):
             use_rms_prop=False,
             use_sde=False,
             normalize_advantage=False,
-            tensorboard_log=log_dir,
+            tensorboard_log=None,
             create_eval_env=False,
             policy_kwargs=hyperparameters["policy_kwargs"],
             verbose=1,
-            seed=args["seed"],
-            device=args["device"],
+            seed=seed,
+            device=self.cl_args["device"],
         )
+
         agent.set_logger(logger)
         agent.learn(
             total_timesteps=hyperparameters["total_timesteps"],
             callback=None,
-            log_interval=args["log_interval"],
+            log_interval=self.cl_args["log_interval"],
             eval_env=None,
             eval_freq=-1,
             n_eval_episodes=0,
             tb_log_name=self.exp_name,
             eval_log_path=None,
         )
-        score = log_weighted_average_score(log_dir, "rollout/ep_rew_mean")
+        score = log_weighted_average_score(logger.get_dir(), "rollout/ep_rew_mean")
         return agent, score
 
 if __name__ == "__main__":

@@ -79,6 +79,6 @@ class BaseDenseActorCritic(torch.nn.Module, ABC):
             std = torch.nn.functional.softplus(std_logits) + 0.1
             return torch.distributions.Independent(
                 torch.distributions.Normal(loc=mean_logits, scale=std),
-                reinterpreted_batch_ndims=-1)
+                reinterpreted_batch_ndims=1)
         else:
             raise NotImplementedError("Unsupported action space: {}".format(self.action_space))

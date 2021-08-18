@@ -1,5 +1,7 @@
 from typing import List
 import argparse
+import numpy as np
+import torch
 
 from modular_baselines.algorithms.a2c.a2c import A2C
 from modular_baselines.loggers.basic import InitLogCallback, LogRolloutCallback, LogLossCallback
@@ -11,11 +13,14 @@ from configs import all_configs
 
 class A2CExperiment(MBExperiment):
 
-    def _setup(self, hyperparameters, vecenv, logger):
+    def _setup(self, hyperparameters, vecenv, logger, seed):
+        np.random.seed(seed)
+        torch.manual_seed(seed)
         policy = self.config.policy(observation_space=vecenv.observation_space,
                                     action_space=vecenv.action_space,
                                     lr=hyperparameters["lr"],
                                     **hyperparameters["policy_kwargs"])
+        policy.to(self.cl_args["device"])
         agent = A2C.setup(
             env=vecenv,
             policy=policy,

@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import List, Union, Optional, Tuple
 from abc import ABC, abstractmethod
+import numpy as np
 from gym.spaces import Discrete, Box
 import torch
 
@@ -43,16 +44,25 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
                          action: torch.Tensor,
                          last_next_obseration: torch.Tensor,
                          ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        # for param in self.parameters():
+        #     print(param.min().item(), param.max().item())
+        # print("- " * 40)
+        # input()
         pi_logits = self.pi_network(observation)
         pi_dist = self.get_dist(logits=pi_logits)
         concat_values = self.value_network(
             torch.cat([observation, last_next_obseration.unsqueeze(1)], dim=1)
         )
         values, last_value = concat_values[:, :-1], concat_values[:, -1]
-        if len(action.shape) != len(observation.shape):
-            action = action.unsqueeze(-1)
+        if isinstance(self.action_space, Discrete):
+            action = action.squeeze(-1)
         log_probs = pi_dist.log_prob(action).unsqueeze(-1)
         entropies = pi_dist.entropy().unsqueeze(-1)
+        # print(values.min().item(), values.max().item())
+        # print(log_probs.min().item(), log_probs.max().item())
+        # print(entropies.min().item(), entropies.max().item())
+        # print("- " * 40)
+        # input()
         return values, log_probs, entropies, last_value
 
     def init_state(self, batch_size=None):
@@ -67,6 +77,6 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
         pi_logits = self.pi_network(observation)
         pi_dist = self.get_dist(logits=pi_logits)
         action = pi_dist.sample()
-        if len(action.shape) != len(observation.shape):
+        if isinstance(self.action_space, Discrete):
             action = action.unsqueeze(-1)
         return action.cpu().numpy(), None, {}
