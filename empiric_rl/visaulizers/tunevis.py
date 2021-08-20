@@ -8,7 +8,7 @@ import ipywidgets
 import plotly.graph_objects as go
 
 
-def load_study(storage_path: str, study_name: Optional[str]):
+def load_study(storage_path: str, study_name: Optional[str] = None):
     study_name = study_name or storage_path.split("/")[-2][5:]
     return optuna.load_study(study_name, storage=storage_path)
 
@@ -75,6 +75,8 @@ def plot_trials(study: optuna.Study):
         width=650,
         height=500,
     )
+    return fig
+
 def make_hover_text(trial):
     return "<br>".join(["<b>{}</b>: {}".format(key, value)
                         for key, value in chain(
