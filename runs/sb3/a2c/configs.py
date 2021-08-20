@@ -74,7 +74,7 @@ BipedalWalkerConfig = SB3Config(
             tune_fn=lambda trial: trial.suggest_loguniform("lr", 1e-5, 1e-2)),
         n_steps=HyperParameter(
             default=8,
-            tune_fn=None),
+            tune_fn=lambda trial: trial.suggest_int("n_steps", 1, 16)),
         n_envs=HyperParameter(
             default=16,
             tune_fn=None),
@@ -101,7 +101,7 @@ BipedalWalkerConfig = SB3Config(
                 default=[200, 300],
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "pi_layer_widths",
-                    ["[128, 128]", "[64, 64, 64]", "[200, 300]"]),
+                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
                 interpret=lambda choice: json.loads(choice)),
             value_layer_widths=HyperParameter(
                 default=[256, 256, 256],

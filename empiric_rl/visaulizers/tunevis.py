@@ -74,6 +74,7 @@ def plot_trials(study: optuna.Study):
         ),
         width=650,
         height=500,
+        template="plotly_white",
     )
     return fig
 
