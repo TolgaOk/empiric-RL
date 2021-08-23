@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Union, List, Optional
 import torch
+import numpy as np
 from gym.spaces import Box, Discrete
 
 
@@ -33,10 +34,38 @@ class DenseNet(torch.nn.Module):
         return self.network(input_tensor)
 
 
+class ConvNet(torch.nn.Module):
+
+    def __init__(self,
+                 in_channels: int,
+                 activation_fn: torch.nn.Module = torch.nn.ELU,
+                 channel_depths: List[int] = [64, 64, 128, 256, 512],
+                 kernel_size: int = 5,
+                 padding: int = 2,
+                 stride: int = 2,
+                 maxpool: int = 1):
+        super().__init__()
+        layers = []
+        prev_depth = in_channels
+        for depth in channel_depths:
+            layers += [
+                torch.nn.Conv2d(prev_depth, depth,
+                                kernel_size=kernel_size, padding=padding, stride=stride),
+                activation_fn(),
+            ]
+            prev_depth = depth
+            layers.append(torch.nn.AdaptiveMaxPool2d(maxpool))
+        self.net = torch.nn.Sequential(*layers)
+
+    def forward(self, img):
+        output = self.net(img)
+        return output.reshape(*output.shape[:-3], np.product(output.shape[-3:]))
+
+
 class BaseDenseActorCritic(torch.nn.Module, ABC):
 
     def __init__(self,
-                 observation_space: Box,
+                 in_size: int,
                  action_space: Union[Box,  Discrete],
                  lr: float,
                  pi_layer_widths: List[int],
@@ -46,25 +75,24 @@ class BaseDenseActorCritic(torch.nn.Module, ABC):
                  ) -> None:
         super().__init__()
 
-        assert len(observation_space.shape) == 1, (
-            "{} expects flatten observations, but given: {}".format(
-                __class__.__name__, observation_space.shape))
-
         self.action_space = action_space
-        self.input_size = observation_space.shape[0]
+        self.input_size = in_size
+        self.lr = lr
         self.pi_out_size = action_space.n if isinstance(
             action_space, Discrete) else action_space.shape[0] * 2
 
         self.pi_network = DenseNet(self.input_size, self.pi_out_size,
                                    pi_layer_widths, pi_activation_fn)
         self.value_network = DenseNet(self.input_size, 1, value_layer_widths, value_activation_fn)
-        self._optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self._optimizer = None
 
         # Last action Layer Initialization
         self.pi_network.network[-1].apply(lambda layer: layer.weight.data.div_(100))
 
     @property
     def optimizer(self):
+        if self._optimizer is None:
+            self._optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return self._optimizer
 
     @abstractmethod

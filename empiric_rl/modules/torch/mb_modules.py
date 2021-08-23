@@ -1,12 +1,12 @@
 from abc import ABC
-from typing import List, Union, Optional, Tuple
-from abc import ABC, abstractmethod
+from typing import List, Union, Optional, Tuple, Dict, Any
 import numpy as np
 from gym.spaces import Discrete, Box
 import torch
+import warnings
 
 from modular_baselines.algorithms.a2c.torch_policy import TorchA2CPolicy
-from empiric_rl.modules.torch.base_module import BaseDenseActorCritic
+from empiric_rl.modules.torch.base_module import BaseDenseActorCritic, ConvNet
 
 
 class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
@@ -20,9 +20,9 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
                  pi_activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU,
                  value_activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU,
                  device: Optional[str] = "cpu") -> None:
-
+        assert len(observation_space.shape) == 1, "Dense AC only accepts flattened obs space"
         BaseDenseActorCritic.__init__(self,
-                                      observation_space,
+                                      observation_space.shape[0],
                                       action_space,
                                       lr,
                                       pi_layer_widths,
@@ -44,10 +44,6 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
                          action: torch.Tensor,
                          last_next_obseration: torch.Tensor,
                          ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        # for param in self.parameters():
-        #     print(param.min().item(), param.max().item())
-        # print("- " * 40)
-        # input()
         pi_logits = self.pi_network(observation)
         pi_dist = self.get_dist(logits=pi_logits)
         concat_values = self.value_network(
@@ -58,11 +54,6 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
             action = action.squeeze(-1)
         log_probs = pi_dist.log_prob(action).unsqueeze(-1)
         entropies = pi_dist.entropy().unsqueeze(-1)
-        # print(values.min().item(), values.max().item())
-        # print(log_probs.min().item(), log_probs.max().item())
-        # print(entropies.min().item(), entropies.max().item())
-        # print("- " * 40)
-        # input()
         return values, log_probs, entropies, last_value
 
     def init_state(self, batch_size=None):
@@ -70,13 +61,73 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
         return None
 
     def sample_action(self,
-                      observation: torch.Tensor,
+                      observation: Union[np.ndarray, torch.Tensor],
                       policy_state: Union[None, torch.Tensor]
                       ) -> torch.Tensor:
-        observation = torch.from_numpy(observation).to(self.device)
+        if isinstance(observation, np.ndarray):
+            observation = torch.from_numpy(observation).to(self.device)
         pi_logits = self.pi_network(observation)
         pi_dist = self.get_dist(logits=pi_logits)
         action = pi_dist.sample()
         if isinstance(self.action_space, Discrete):
             action = action.unsqueeze(-1)
         return action.cpu().numpy(), None, {}
+
+
+class MBConvActorCritic(MBDenseActorCritic):
+
+    def __init__(self,
+                 observation_space: Box,
+                 action_space: Union[Box, Discrete],
+                 lr: float,
+                 pi_layer_widths: List[int],
+                 value_layer_widths: List[int],
+                 pi_activation_fn: Optional[torch.nn.Module],
+                 value_activation_fn: Optional[torch.nn.Module],
+                 conv_net_kwargs: Dict[str, Any],
+                 device: Optional[str] = "cpu") -> None:
+        if observation_space.shape[-3] > 4:
+            warnings.warn("Expected channel axis is -3!")
+        flattened_obs_space = Box(low=-np.inf, high=np.inf,
+                                  shape=(conv_net_kwargs["maxpool"]**2 *
+                                         conv_net_kwargs["channel_depths"][-1],))
+        super().__init__(flattened_obs_space,
+                         action_space,
+                         lr,
+                         pi_layer_widths,
+                         value_layer_widths,
+                         pi_activation_fn=pi_activation_fn,
+                         value_activation_fn=value_activation_fn,
+                         device=device)
+        self.conv_net = ConvNet(observation_space.shape[-3], **conv_net_kwargs)
+
+    def sample_action(self,
+                      obs_image: np.ndarray,
+                      policy_state: Union[None, torch.Tensor]
+                      ) -> torch.Tensor:
+        obs_image = torch.from_numpy(obs_image).to(self.device)
+        flat_features = self.conv_net(self.pre_process(obs_image))
+        return super().sample_action(flat_features, policy_state)
+
+    def evaluate_rollout(self,
+                         obs_image: torch.Tensor,
+                         policy_state: Union[None, torch.Tensor],
+                         action: torch.Tensor,
+                         last_next_obs_img: torch.Tensor,
+                         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        concat_obs = torch.cat([self.pre_process(obs_image),
+                       self.pre_process(last_next_obs_img).unsqueeze(1)], dim=1)
+        batch_shape = concat_obs.shape[:2]
+        concat_obs = concat_obs.reshape(np.product(batch_shape), *concat_obs.shape[2:])
+        concat_features = self.conv_net(concat_obs)
+        concat_features = concat_features.reshape(
+            *batch_shape, *concat_features.shape[1:])
+        features, last_next_feature = concat_features[:, :-1], concat_features[:, -1]
+
+        return super().evaluate_rollout(features,
+                                        policy_state,
+                                        action,
+                                        last_next_feature)
+
+    def pre_process(self, obs_image: torch.Tensor):
+        return obs_image.float() / 255

@@ -19,7 +19,8 @@ class A2CExperiment(MBExperiment):
         policy = self.config.policy(observation_space=vecenv.observation_space,
                                     action_space=vecenv.action_space,
                                     lr=hyperparameters["lr"],
-                                    **hyperparameters["policy_kwargs"])
+                                    **hyperparameters["policy_kwargs"],
+                                    device=self.cl_args["device"])
         policy.to(self.cl_args["device"])
         agent = A2C.setup(
             env=vecenv,

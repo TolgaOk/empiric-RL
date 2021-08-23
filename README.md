@@ -9,7 +9,7 @@ Benchmarking package of common RL environments with standardized hyperparameters
 
 |  Environment  | Observation Space | Action Space | [Stable Baselines 3](https://github.com/DLR-RM/stable-baselines3)   | ModularBaselines | Ray Rllib |
 |:-------------:|-------------------|:------------:|--------------------|------------------|-----------|
-|  LunarLander  | Continuous        | Discrete     | :heavy_check_mark: |                  |           |
-| BipedalWalker | Continuous        | Continuous   | :heavy_check_mark: |                  |           |
-| CartPole      | Continuous        | Discrete     | :heavy_check_mark: |                  |           |
+|  LunarLander  | Continuous        | Discrete     | :heavy_check_mark: |:heavy_check_mark:|           |
+| BipedalWalker | Continuous        | Continuous   | :heavy_check_mark: |:heavy_check_mark:|           |
+| CartPole      | Continuous        | Discrete     | :heavy_check_mark: |:heavy_check_mark:|           |
 | Atari         | Vision            | Discrete     |                    |                  |           |

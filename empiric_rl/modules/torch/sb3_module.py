@@ -35,8 +35,9 @@ class SB3DenseActorCritic(BaseDenseActorCritic, BaseSB3Modules):
                  pi_activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU,
                  value_activation_fn: Optional[torch.nn.Module] = torch.nn.ReLU,
                  ) -> None:
+        assert len(observation_space.shape) == 1, "Dense AC only accepts flattened obs space"
         BaseDenseActorCritic.__init__(self,
-                                      observation_space=observation_space,
+                                      in_size=observation_space.shape[0],
                                       action_space=action_space,
                                       lr=lr_schduler(1),
                                       pi_layer_widths=pi_layer_widths,

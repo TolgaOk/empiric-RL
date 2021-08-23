@@ -5,6 +5,8 @@ import json
 import numpy as np
 import optuna
 
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvWrapper
+
 
 class HyperParameter(NamedTuple):
     default: Any
@@ -12,7 +14,9 @@ class HyperParameter(NamedTuple):
     interpret: Optional[Callable] = None
 
 
-def apply_wrappers(environment: gym.Env, wrappers: List[gym.Wrapper]) -> gym.Env:
+def apply_wrappers(environment: gym.Env,
+                   wrappers: List[Union[gym.Wrapper, VecEnvWrapper]]
+                   ) -> gym.Env:
     for wrapper in wrappers:
         environment = wrapper(environment)
     return environment
@@ -41,6 +45,7 @@ def _realize_value(value: HyperParameter, trial: optuna.Trial):
     if value.interpret is not None:
         return value.interpret(value.tune_fn(trial))
     return value.tune_fn(trial)
+
 
 def auto_file_name(dir_path: str, name: str, suffix=""):
     path = os.path.join(dir_path, name + suffix)
