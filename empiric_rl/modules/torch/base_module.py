@@ -1,7 +1,6 @@
 from abc import abstractmethod, ABC
 from typing import Union, List, Optional
 import torch
-import numpy as np
 from gym.spaces import Box, Discrete
 
 
@@ -40,26 +39,57 @@ class ConvNet(torch.nn.Module):
                  in_channels: int,
                  activation_fn: torch.nn.Module = torch.nn.ELU,
                  channel_depths: List[int] = [64, 64, 128, 256, 512],
-                 kernel_size: int = 5,
-                 padding: int = 2,
-                 stride: int = 2,
-                 maxpool: int = 1):
+                 kernel_size: Union[int, List[int]] = 5,
+                 padding: Union[int, List[int]] = 2,
+                 stride: Union[int, List[int]] = 2,
+                 maxpool: Optional[int] = None):
         super().__init__()
+
+        self.channel_depths = channel_depths
+        self.kernel_size = self._check_conv_parameters(kernel_size)
+        self.stride = self._check_conv_parameters(stride)
+        self.padding = self._check_conv_parameters(padding)
+
         layers = []
         prev_depth = in_channels
-        for depth in channel_depths:
+
+        for depth, n_kernel, n_stride, n_pad in zip(self.channel_depths,
+                                                    self.kernel_size,
+                                                    self.stride,
+                                                    self.padding):
             layers += [
                 torch.nn.Conv2d(prev_depth, depth,
-                                kernel_size=kernel_size, padding=padding, stride=stride),
+                                kernel_size=n_kernel, padding=n_pad, stride=n_stride),
                 activation_fn(),
             ]
             prev_depth = depth
+        if maxpool is not None:
             layers.append(torch.nn.AdaptiveMaxPool2d(maxpool))
+        layers.append(torch.nn.Flatten())
         self.net = torch.nn.Sequential(*layers)
 
+        self.apply(self.orthogonal_init)
+
+    def orthogonal_init(self, module):
+        if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d)):
+            torch.nn.init.orthogonal_(module.weight, gain=1)
+            if module.bias is not None:
+                module.bias.data.fill_(0.0)
+
     def forward(self, img):
-        output = self.net(img)
-        return output.reshape(*output.shape[:-3], np.product(output.shape[-3:]))
+        return self.net(img)
+
+    def pre_process(self, obs_image: torch.Tensor):
+        return obs_image.float() / 255
+
+    def _check_conv_parameters(self, parameter):
+        if isinstance(parameter, list):
+            assert len(parameter) == len(self.channel_depths)
+        elif isinstance(parameter, int):
+            parameter = [parameter] * len(self.channel_depths)
+        else:
+            raise ValueError("Convolution parameters must be an integer or list type")
+        return parameter
 
 
 class BaseDenseActorCritic(torch.nn.Module, ABC):

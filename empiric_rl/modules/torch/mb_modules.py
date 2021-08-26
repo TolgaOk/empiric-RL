@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import List, Union, Optional, Tuple, Dict, Any
 import numpy as np
 from gym.spaces import Discrete, Box
@@ -87,11 +86,11 @@ class MBConvActorCritic(MBDenseActorCritic):
                  conv_net_kwargs: Dict[str, Any],
                  device: Optional[str] = "cpu") -> None:
         if observation_space.shape[-3] > 4:
-            warnings.warn("Expected channel axis is -3!")
-        flattened_obs_space = Box(low=-np.inf, high=np.inf,
+            warnings.warn("Expected channel axis is [-3]")
+        feature_obs_space = Box(low=-np.inf, high=np.inf,
                                   shape=(conv_net_kwargs["maxpool"]**2 *
                                          conv_net_kwargs["channel_depths"][-1],))
-        super().__init__(flattened_obs_space,
+        super().__init__(feature_obs_space,
                          action_space,
                          lr,
                          pi_layer_widths,
@@ -106,7 +105,7 @@ class MBConvActorCritic(MBDenseActorCritic):
                       policy_state: Union[None, torch.Tensor]
                       ) -> torch.Tensor:
         obs_image = torch.from_numpy(obs_image).to(self.device)
-        flat_features = self.conv_net(self.pre_process(obs_image))
+        flat_features = self.conv_net(self.conv_net.pre_process(obs_image))
         return super().sample_action(flat_features, policy_state)
 
     def evaluate_rollout(self,
@@ -115,8 +114,8 @@ class MBConvActorCritic(MBDenseActorCritic):
                          action: torch.Tensor,
                          last_next_obs_img: torch.Tensor,
                          ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        concat_obs = torch.cat([self.pre_process(obs_image),
-                       self.pre_process(last_next_obs_img).unsqueeze(1)], dim=1)
+        concat_obs = torch.cat([self.conv_net.pre_process(obs_image),
+                       self.conv_net.pre_process(last_next_obs_img).unsqueeze(1)], dim=1)
         batch_shape = concat_obs.shape[:2]
         concat_obs = concat_obs.reshape(np.product(batch_shape), *concat_obs.shape[2:])
         concat_features = self.conv_net(concat_obs)
@@ -129,5 +128,4 @@ class MBConvActorCritic(MBDenseActorCritic):
                                         action,
                                         last_next_feature)
 
-    def pre_process(self, obs_image: torch.Tensor):
-        return obs_image.float() / 255
+    
