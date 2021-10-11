@@ -17,7 +17,7 @@ from empiric_rl.modules.torch.sb3_module import BaseSB3Modules
 @dataclass
 class SB3Config(BaseConfig):
     policy: Union[str, Type[ActorCriticPolicy], Type[BaseSB3Modules]]
-    sb3_wrappers: List[VecEnvWrapper]
+    sb3_wrappers: List[Dict[str, Union[VecEnvWrapper, Dict[str, Any]]]]
 
 
 class SB3Experiment(BaseExperiment):

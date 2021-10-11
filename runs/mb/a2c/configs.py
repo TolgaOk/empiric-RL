@@ -8,12 +8,12 @@ from stable_baselines3.common.vec_env.vec_frame_stack import VecFrameStack
 
 from empiric_rl.modules.torch.mb_modules import MBDenseActorCritic, MBConvActorCritic
 from empiric_rl.utils import HyperParameter
-from empiric_rl.trainers.sb3_trainer import SB3Config
+from empiric_rl.trainers.sb3_trainer import MBConfig
 from empiric_rl.trainers.base_trainer import TunerInfo
 from empiric_rl.wrappers.common import FloatObservation
 
 
-LunarLanderConfig = SB3Config(
+LunarLanderConfig = MBConfig(
     policy=MBDenseActorCritic,
     hyperparameters=dict(
         lr=HyperParameter(
@@ -69,7 +69,7 @@ LunarLanderConfig = SB3Config(
     )
 )
 
-BipedalWalkerConfig = SB3Config(
+BipedalWalkerConfig = MBConfig(
     policy=MBDenseActorCritic,
     hyperparameters=dict(
         lr=HyperParameter(
@@ -137,7 +137,7 @@ BipedalWalkerConfig = SB3Config(
     )
 )
 
-AtariConfig = SB3Config(
+AtariConfig = MBConfig(
     policy=MBConvActorCritic,
     hyperparameters=dict(
         lr=HyperParameter(

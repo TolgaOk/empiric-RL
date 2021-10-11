@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 import optuna
 import gym
+import json
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import configure
@@ -30,8 +31,29 @@ class TunerInfo:
 class BaseConfig:
     policy: Any
     hyperparameters: Dict[str, Union[Dict[str, HyperParameter], HyperParameter]]
-    gym_wrappers: List[gym.Wrapper]
+    gym_wrappers: List[Dict[str, Union[gym.Wrapper, Dict[str, Any]]]]
     tuner: Optional[TunerInfo]
+
+
+class BaseaConfigEncoder():
+    @staticmethod
+    def encode(config: BaseConfig,
+               realized_hyperparameters: Dict[str, Any],
+               seed: int):
+        return dict(
+            policy=config.policy.__class__.__name__,
+            hyperparameters=realized_hyperparameters,
+            seed=seed,
+            gym_wrappers=[dict(wrapper=info["class"].__name__,
+                               kwargs=info["kwargs"])
+                          for info in config.gym_wrappers],
+            tuner=dict(
+                sampler_cls=config.tuner.sampler_cls.__name__,
+                n_startup_trials=config.tuner.n_startup_trials,
+                n_trials=config.tuner.n_trials,
+                n_procs=config.tuner.n_procs,
+                direction=config.tuner.direction)
+        )
 
 
 class BaseExperiment(ABC):
@@ -47,6 +69,10 @@ class BaseExperiment(ABC):
         self.main_dir = cl_args["log_dir"]
         if self.cl_args["tune"]:
             self.main_dir = make_run_dir(self.main_dir, "Tune_"+self.exp_name)
+
+    @property
+    def config_encoder_class(self):
+        return BaseaConfigEncoder
 
     @abstractmethod
     def setup(self, trial: Optional[optuna.Trial] = None):
@@ -84,6 +110,9 @@ class BaseExperiment(ABC):
 
         if self.cl_args["save_model"]:
             agent.save(log_dir)
+        with open(os.path.join(log_dir, "meta-data.json"), "w") as file:
+            json.dump(dict(commandline_args=self.cl_args,
+                           config=self.config_encoder_class.encode(self.config, hyperparameters, seed)), file)
 
         return score
 

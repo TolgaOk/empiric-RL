@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from abc import abstractmethod
 from dataclasses import dataclass
 import argparse
@@ -7,13 +7,13 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnvWrapper
 
 from modular_baselines.policies.policy import BasePolicy
 
-from empiric_rl.trainers.base_trainer import BaseExperiment
+from empiric_rl.trainers.base_trainer import BaseExperiment, BaseConfig
 
 
 @dataclass
-class MBConfig:
+class MBConfig(BaseConfig):
     policy: BasePolicy
-    sb3_wrappers: List[VecEnvWrapper]
+    sb3_wrappers: List[Dict[str, Union[VecEnvWrapper, Dict[str, Any]]]]
 
 
 class MBExperiment(BaseExperiment):
