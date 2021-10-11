@@ -42,7 +42,9 @@ class ConvNet(torch.nn.Module):
                  kernel_size: Union[int, List[int]] = 5,
                  padding: Union[int, List[int]] = 2,
                  stride: Union[int, List[int]] = 2,
-                 maxpool: Optional[int] = None):
+                 maxpool: Optional[int] = None,
+                 use_flatten: bool = True,
+                 use_end_nonlinearity = True,):
         super().__init__()
 
         self.channel_depths = channel_depths
@@ -63,9 +65,12 @@ class ConvNet(torch.nn.Module):
                 activation_fn(),
             ]
             prev_depth = depth
+        if use_end_nonlinearity is False:
+            layers.pop()
         if maxpool is not None:
             layers.append(torch.nn.AdaptiveMaxPool2d(maxpool))
-        layers.append(torch.nn.Flatten())
+        if use_flatten:
+            layers.append(torch.nn.Flatten())
         self.net = torch.nn.Sequential(*layers)
 
         self.apply(self.orthogonal_init)

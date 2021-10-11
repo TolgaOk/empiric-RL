@@ -4,6 +4,7 @@ import os
 import json
 import numpy as np
 import optuna
+from warnings import warn
 
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvWrapper
 
@@ -15,10 +16,10 @@ class HyperParameter(NamedTuple):
 
 
 def apply_wrappers(environment: gym.Env,
-                   wrappers: List[Union[gym.Wrapper, VecEnvWrapper]]
+                   wrappers: List[Dict[str, Union[VecEnvWrapper, Dict[str, Any]]]]
                    ) -> gym.Env:
-    for wrapper in wrappers:
-        environment = wrapper(environment)
+    for wrapper_info in wrappers:
+        environment = wrapper_info["class"](environment, **wrapper_info["kwargs"])
     return environment
 
 
@@ -74,7 +75,8 @@ def load_from_progress(log_dir: str, key_name: str):
 
     values = [float(row[key_name]) for row in progress if key_name in row.keys()]
     if len(values) == 0:
-        raise ValueError("Key: {} is not found in progress.json".format(key_name))
+        warn("Key: {} is not found in progress.json".format(key_name))
+        return [-np.inf]
     return values
 
 
