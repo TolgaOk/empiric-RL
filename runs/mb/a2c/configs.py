@@ -8,7 +8,7 @@ from stable_baselines3.common.vec_env.vec_frame_stack import VecFrameStack
 
 from empiric_rl.modules.torch.mb_modules import MBDenseActorCritic, MBConvActorCritic
 from empiric_rl.utils import HyperParameter
-from empiric_rl.trainers.sb3_trainer import MBConfig
+from empiric_rl.trainers.mb_trainer import MBConfig
 from empiric_rl.trainers.base_trainer import TunerInfo
 from empiric_rl.wrappers.common import FloatObservation
 
@@ -45,17 +45,22 @@ LunarLanderConfig = MBConfig(
             tune_fn=None),
         policy_kwargs=dict(
             pi_layer_widths=HyperParameter(
-                default=[128, 128],
-                tune_fn=None),
+                default="[128, 128]",
+                tune_fn=lambda trial: trial.suggest_categorical(
+                    "pi_layer_widths",
+                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
+                interpret=lambda choice: json.loads(choice)),
             value_layer_widths=HyperParameter(
                 default=[128, 128],
                 tune_fn=None),
             pi_activation_fn=HyperParameter(
-                default=torch.nn.ELU,
-                tune_fn=None),
+                default="ELU",
+                tune_fn=None,
+                interpret=lambda name: getattr(torch.nn, name)),
             value_activation_fn=HyperParameter(
-                default=torch.nn.ELU,
-                tune_fn=None),
+                default="ELU",
+                tune_fn=None,
+                interpret=lambda name: getattr(torch.nn, name)),
         )
     ),
     gym_wrappers=[],
@@ -63,7 +68,7 @@ LunarLanderConfig = MBConfig(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=5,
-        n_trials=5,
+        n_trials=6,
         n_procs=1,
         direction="maximize",
     )
@@ -101,32 +106,32 @@ BipedalWalkerConfig = MBConfig(
             tune_fn=None),
         policy_kwargs=dict(
             pi_layer_widths=HyperParameter(
-                default=[200, 300],
+                default="[200, 300]",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "pi_layer_widths",
                     ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
                 interpret=lambda choice: json.loads(choice)),
             value_layer_widths=HyperParameter(
-                default=[256, 256, 256],
+                default="[256, 256, 256]",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "value_layer_widths",
                     ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
                 interpret=lambda choice: json.loads(choice)),
             pi_activation_fn=HyperParameter(
-                default=torch.nn.Tanh,
+                default="Tanh",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "pi_activation_fn",
                     ["ELU", "Tanh", "ReLU"]),
                 interpret=lambda choice: getattr(torch.nn, choice)),
             value_activation_fn=HyperParameter(
-                default=torch.nn.ELU,
+                default="ELU",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "value_activation_fn",
                     ["ELU", "Tanh", "ReLU"]),
                 interpret=lambda choice: getattr(torch.nn, choice)),
         )
     ),
-    gym_wrappers=[FloatObservation],
+    gym_wrappers=[{"class": FloatObservation, "kwargs": {}}],
     sb3_wrappers=[],
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
@@ -169,42 +174,42 @@ AtariConfig = MBConfig(
             tune_fn=None),
         policy_kwargs=dict(
             pi_layer_widths=HyperParameter(
-                default=[512],
+                default="[512]",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "pi_layer_widths",
-                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
+                    ["[512]", "[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
                 interpret=lambda choice: json.loads(choice)),
             value_layer_widths=HyperParameter(
-                default=[512],
+                default="[512]",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "value_layer_widths",
-                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
+                    ["[512]", "[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
                 interpret=lambda choice: json.loads(choice)),
             pi_activation_fn=HyperParameter(
-                default=torch.nn.ReLU,
+                default="ReLU",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "pi_activation_fn",
                     ["ELU", "Tanh", "ReLU"]),
                 interpret=lambda choice: getattr(torch.nn, choice)),
             value_activation_fn=HyperParameter(
-                default=torch.nn.ELU,
+                default="ELU",
                 tune_fn=lambda trial: trial.suggest_categorical(
                     "value_activation_fn",
                     ["ELU", "Tanh", "ReLU"]),
                 interpret=lambda choice: getattr(torch.nn, choice)),
             conv_net_kwargs=dict(
                 activation_fn=HyperParameter(
-                    default=torch.nn.ReLU,
+                    default="ReLU",
                     tune_fn=lambda trial: trial.suggest_categorical(
-                        "conv_activation_fn",
+                        "activation_fn",
                         ["ELU", "Tanh", "ReLU"]),
                     interpret=lambda choice: getattr(torch.nn, choice)),
                 channel_depths=HyperParameter(
-                    default=[32, 64, 64],
+                    default="[32, 64, 64]",
                     tune_fn=lambda trial: trial.suggest_categorical(
                         "channel_depths",
-                        ["[64, 128, 128, 256, 512]", "[64, 128, 256, 512]",
-                         "[256, 256, 256, 256, 256]", "[64, 64, 64]"])),
+                        ["[32, 64, 64]", "[64, 64, 64]"]),
+                    interpret=lambda choice: json.loads(choice)),
                 kernel_size=HyperParameter(
                     default=[8, 4, 3],
                     tune_fn=None),
@@ -220,9 +225,9 @@ AtariConfig = MBConfig(
             )
         )
     ),
-    gym_wrappers=[AtariWrapper],
-    sb3_wrappers=[lambda vecenv: VecFrameStack(vecenv, 4),
-                  VecTransposeImage],
+    gym_wrappers=[{"class": AtariWrapper, "kwargs": {}}],
+    sb3_wrappers=[{"class": VecFrameStack, "kwargs": {"n_stack": 4}},
+                  {"class": VecTransposeImage, "kwargs": {}}],
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=10,

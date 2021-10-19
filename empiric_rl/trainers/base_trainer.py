@@ -5,6 +5,7 @@ import os
 import argparse
 import numpy as np
 import optuna
+import pickle
 import gym
 import json
 
@@ -13,9 +14,10 @@ from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 from empiric_rl.utils import (HyperParameter,
-                              realize_hyperparameter,
+                              realize_hyperparameters,
                               apply_wrappers,
-                              make_run_dir)
+                              make_run_dir,
+                              auto_redis_name)
 
 
 @dataclass
@@ -61,12 +63,16 @@ class BaseExperiment(ABC):
     def __init__(self,
                  configs: BaseConfig,
                  cl_args: Dict[str, Any],
-                 exp_name_prefix: Optional[str] = ""):
+                 exp_name_prefix: Optional[str] = "",):
         self.cl_args = cl_args
         env_class_name = self.make_env().env.__class__.__name__
         self.config = configs[env_class_name]
         self.exp_name = "_".join([exp_name_prefix, env_class_name])
         self.main_dir = cl_args["log_dir"]
+        if self.cl_args["tune"] is False:
+            if self.cl_args["n_seeds"] > 1 or self.cl_args["start_tune_with_default_params"]:
+                raise ValueError("CL argumenents 'n-seeds' and 'start-tune-with-default-params'"
+                                 " can only be used in tune mode")
         if self.cl_args["tune"]:
             self.main_dir = make_run_dir(self.main_dir, "Tune_"+self.exp_name)
 
@@ -94,7 +100,11 @@ class BaseExperiment(ABC):
         return gym.make(self.cl_args["env_name"])
 
     def setup(self, trial: Optional[optuna.Trial] = None) -> float:
-        hyperparameters = realize_hyperparameter(self.config.hyperparameters, trial=trial)
+        hyperparameters, jsonized_hyperparameters = realize_hyperparameters(
+            self.config.hyperparameters,
+            trial=trial,
+            n_repeat=self.cl_args["n_seeds"],
+            start_with_default=self.cl_args["start_tune_with_default_params"])
         seed = self.make_seed(self.cl_args["seed"], trial)
         vecenv = make_vec_env(
             lambda: apply_wrappers(self.make_env(), self.config.gym_wrappers),
@@ -112,13 +122,18 @@ class BaseExperiment(ABC):
             agent.save(log_dir)
         with open(os.path.join(log_dir, "meta-data.json"), "w") as file:
             json.dump(dict(commandline_args=self.cl_args,
-                           config=self.config_encoder_class.encode(self.config, hyperparameters, seed)), file)
-
+                           config=self.config_encoder_class.encode(
+                               self.config, jsonized_hyperparameters, seed)), file)
         return score
 
     def tune(self) -> None:
-        storage_url = "".join(("sqlite:///", os.path.join(self.main_dir, "store.db")))
+        storage_url = self.cl_args["storage_url"]
         study_name = self.exp_name
+        if storage_url is None:
+            storage_url = "".join(("sqlite:///", os.path.join(self.main_dir, "store.db")))
+        if storage_url.startswith("redis://") and not self.cl_args["continue_study"]:
+            study_name = auto_redis_name(self.get_all_redis_study_names(storage_url), study_name)
+
         sampler = self.config.tuner.sampler_cls(
             n_startup_trials=self.config.tuner.n_startup_trials)
         study = optuna.create_study(
@@ -126,11 +141,17 @@ class BaseExperiment(ABC):
             sampler=sampler,
             study_name=study_name,
             direction=self.config.tuner.direction,
-            load_if_exists=True)
+            load_if_exists=self.cl_args["continue_study"])
         study.optimize(
             self.setup,
             n_trials=self.config.tuner.n_trials,
             n_jobs=self.config.tuner.n_procs)
+
+    def get_all_redis_study_names(self, redis_storage_url: str) -> List[str]:
+        redis_storage = optuna.storages.RedisStorage(redis_storage_url)
+        study_ids = [pickle.loads(sid) for sid in redis_storage._redis.lrange("study_list", 0, -1)]
+        study_names = [redis_storage.get_study_name_from_id(_id) for _id in study_ids]
+        return study_names
 
     @staticmethod
     def add_parse_arguments(parser: argparse.ArgumentParser) -> None:
@@ -145,3 +166,12 @@ class BaseExperiment(ABC):
                                   " iterations"))
         parser.add_argument("--log-dir", type=str, default=None,
                             help=("Logging dir"))
+        parser.add_argument("--n-seeds", type=int, default=1,
+                            help=("Run the same parameters for n-seeds many trials. "
+                                  "Used for multi seed experiments"))
+        parser.add_argument("--start-tune-with-default-params", action="store_true",
+                            help="Use default hyperparameters for the first trial")
+        parser.add_argument("--storage-url", type=str, default=None,
+                            help="Optuna storage url. Default: sqlite")
+        parser.add_argument("--continue-study", action="store_true",
+                            help="If given, tuner tries to load a study from the storage")

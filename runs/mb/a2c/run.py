@@ -43,7 +43,7 @@ class A2CExperiment(MBExperiment):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Stable Baselines 3 A2C")
+    parser = argparse.ArgumentParser(description="Modular Baselines A2C")
     A2CExperiment.add_parse_arguments(parser)
 
     args = parser.parse_args()
