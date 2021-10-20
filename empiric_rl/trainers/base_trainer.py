@@ -8,6 +8,7 @@ import optuna
 import pickle
 import gym
 import json
+import socket
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import configure
@@ -18,14 +19,13 @@ from empiric_rl.utils import (HyperParameter,
                               apply_wrappers,
                               make_run_dir,
                               auto_redis_name)
+from empiric_rl.redis_writer import RedisWriter
 
 
 @dataclass
 class TunerInfo:
     sampler_cls: optuna.samplers.BaseSampler
     n_startup_trials: int
-    n_trials: int
-    n_procs: int
     direction: str
 
 
@@ -52,8 +52,6 @@ class BaseaConfigEncoder():
             tuner=dict(
                 sampler_cls=config.tuner.sampler_cls.__name__,
                 n_startup_trials=config.tuner.n_startup_trials,
-                n_trials=config.tuner.n_trials,
-                n_procs=config.tuner.n_procs,
                 direction=config.tuner.direction)
         )
 
@@ -115,15 +113,20 @@ class BaseExperiment(ABC):
 
         log_dir = make_run_dir(self.main_dir, self.exp_name)
         logger = configure(log_dir, ["stdout", "json", "tensorboard", "csv"])
+        if trial is not None:
+            logger.output_formats.append(RedisWriter(trial))
 
         agent, score = self._setup(hyperparameters, vecenv, logger, seed)
 
         if self.cl_args["save_model"]:
             agent.save(log_dir)
         with open(os.path.join(log_dir, "meta-data.json"), "w") as file:
-            json.dump(dict(commandline_args=self.cl_args,
-                           config=self.config_encoder_class.encode(
-                               self.config, jsonized_hyperparameters, seed)), file)
+            json_ready_meta_data = dict(commandline_args=self.cl_args,
+                                        config=self.config_encoder_class.encode(
+                                            self.config, jsonized_hyperparameters, seed),
+                                        local_ip_adress=self.get_local_ip())
+            json.dump(json_ready_meta_data, file)
+            trial.storage.set_trial_user_attr(trial._trial_id, "meta-data", json_ready_meta_data)
         return score
 
     def tune(self) -> None:
@@ -133,6 +136,8 @@ class BaseExperiment(ABC):
             storage_url = "".join(("sqlite:///", os.path.join(self.main_dir, "store.db")))
         if storage_url.startswith("redis://") and not self.cl_args["continue_study"]:
             study_name = auto_redis_name(self.get_all_redis_study_names(storage_url), study_name)
+        if self.cl_args["study_name"] is not None:
+            study_name = self.cl_args["study_name"]
 
         sampler = self.config.tuner.sampler_cls(
             n_startup_trials=self.config.tuner.n_startup_trials)
@@ -142,16 +147,22 @@ class BaseExperiment(ABC):
             study_name=study_name,
             direction=self.config.tuner.direction,
             load_if_exists=self.cl_args["continue_study"])
+        study.set_user_attr("max_trials", self.cl_args["max_trials"])
+
         study.optimize(
             self.setup,
-            n_trials=self.config.tuner.n_trials,
-            n_jobs=self.config.tuner.n_procs)
+            self.cl_args["max_trials"])
 
     def get_all_redis_study_names(self, redis_storage_url: str) -> List[str]:
         redis_storage = optuna.storages.RedisStorage(redis_storage_url)
         study_ids = [pickle.loads(sid) for sid in redis_storage._redis.lrange("study_list", 0, -1)]
         study_names = [redis_storage.get_study_name_from_id(_id) for _id in study_ids]
         return study_names
+
+    def get_local_ip(self):
+        socket_obj = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        socket_obj.connect(('8.8.8.8', 1))  # connect() for UDP doesn't send packets
+        return socket_obj.getsockname()[0]
 
     @staticmethod
     def add_parse_arguments(parser: argparse.ArgumentParser) -> None:
@@ -175,3 +186,8 @@ class BaseExperiment(ABC):
                             help="Optuna storage url. Default: sqlite")
         parser.add_argument("--continue-study", action="store_true",
                             help="If given, tuner tries to load a study from the storage")
+        parser.add_argument("--study-name", type=str, default=None,
+                            help=("Name of the study name in the storage. "
+                                  "Default: Environment name"))
+        parser.add_argument("--max-trials", type=int, default=1,
+                            help="Set the maximum number of trials if a new study is created")

@@ -68,8 +68,6 @@ LunarLanderConfig = MBConfig(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=5,
-        n_trials=6,
-        n_procs=1,
         direction="maximize",
     )
 )
@@ -136,8 +134,6 @@ BipedalWalkerConfig = MBConfig(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=10,
-        n_trials=100,
-        n_procs=1,
         direction="maximize",
     )
 )
@@ -231,8 +227,6 @@ AtariConfig = MBConfig(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=10,
-        n_trials=100,
-        n_procs=1,
         direction="maximize",
     )
 )
