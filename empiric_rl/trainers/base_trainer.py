@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Dict, Union, Optional, Union
+import warnings
+from typing import List, Any, Dict, Union, Optional, Tuple, Callable
 from dataclasses import dataclass
 import os
 import argparse
@@ -9,6 +10,7 @@ import pickle
 import gym
 import json
 import socket
+from optuna.trial import TrialState
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import configure
@@ -149,9 +151,7 @@ class BaseExperiment(ABC):
             load_if_exists=self.cl_args["continue_study"])
         study.set_user_attr("max_trials", self.cl_args["max_trials"])
 
-        study.optimize(
-            self.setup,
-            self.cl_args["max_trials"])
+        self.optimize_study(study, n_trials=self.cl_args["max_trials"])
 
     def get_all_redis_study_names(self, redis_storage_url: str) -> List[str]:
         redis_storage = optuna.storages.RedisStorage(redis_storage_url)
@@ -161,8 +161,24 @@ class BaseExperiment(ABC):
 
     def get_local_ip(self):
         socket_obj = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        socket_obj.connect(('8.8.8.8', 1))  # connect() for UDP doesn't send packets
+        socket_obj.connect(('8.8.8.8', 1))
         return socket_obj.getsockname()[0]
+
+    def optimize_study(self, study: optuna.Study, n_trials: int):
+        if len(study.trials) >= n_trials:
+            warnings.warn("Study: {} has already {} >= {} many trials".format(
+                study.study_name, len(study.trials), n_trials))
+        while len(study.trials) < n_trials:
+            trial = study.ask()
+            try:
+                if trial.number > n_trials:
+                    study.tell(trial, None, state=TrialState.FAIL)
+                else:
+                    score = self.setup(trial)
+                    study.tell(trial, score, state=TrialState.COMPLETE)
+            except:
+                study.tell(trial, None, state=TrialState.FAIL)
+                raise
 
     @staticmethod
     def add_parse_arguments(parser: argparse.ArgumentParser) -> None:
