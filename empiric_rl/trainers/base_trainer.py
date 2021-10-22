@@ -106,6 +106,10 @@ class BaseExperiment(ABC):
             n_repeat=self.cl_args["n_seeds"],
             start_with_default=self.cl_args["start_tune_with_default_params"])
         seed = self.make_seed(self.cl_args["seed"], trial)
+        json_ready_meta_data = dict(commandline_args=self.cl_args,
+                                        config=self.config_encoder_class.encode(
+                                            self.config, jsonized_hyperparameters, seed),
+                                        local_ip_adress=self.get_local_ip())
         vecenv = make_vec_env(
             lambda: apply_wrappers(self.make_env(), self.config.gym_wrappers),
             n_envs=hyperparameters["n_envs"],
@@ -117,18 +121,14 @@ class BaseExperiment(ABC):
         logger = configure(log_dir, ["stdout", "json", "tensorboard", "csv"])
         if trial is not None:
             logger.output_formats.append(RedisWriter(trial))
+            trial.storage.set_trial_user_attr(trial._trial_id, "meta-data", json_ready_meta_data)
 
         agent, score = self._setup(hyperparameters, vecenv, logger, seed)
 
         if self.cl_args["save_model"]:
             agent.save(log_dir)
         with open(os.path.join(log_dir, "meta-data.json"), "w") as file:
-            json_ready_meta_data = dict(commandline_args=self.cl_args,
-                                        config=self.config_encoder_class.encode(
-                                            self.config, jsonized_hyperparameters, seed),
-                                        local_ip_adress=self.get_local_ip())
             json.dump(json_ready_meta_data, file)
-            trial.storage.set_trial_user_attr(trial._trial_id, "meta-data", json_ready_meta_data)
         return score
 
     def tune(self) -> None:
