@@ -12,8 +12,9 @@ import json
 import socket
 from optuna.trial import TrialState
 
-from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.env_util import make_atari_env, make_vec_env
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 from empiric_rl.utils import (HyperParameter,
@@ -110,12 +111,23 @@ class BaseExperiment(ABC):
                                         config=self.config_encoder_class.encode(
                                             self.config, jsonized_hyperparameters, seed),
                                         local_ip_adress=self.get_local_ip())
+
         vecenv = make_vec_env(
-            lambda: apply_wrappers(self.make_env(), self.config.gym_wrappers),
+            self.make_env,
             n_envs=hyperparameters["n_envs"],
             seed=seed,
+            wrapper_class=lambda env: apply_wrappers(env, self.config.gym_wrappers),
             vec_env_cls=SubprocVecEnv)
         vecenv = apply_wrappers(vecenv, self.config.sb3_wrappers)
+
+        eval_env = make_vec_env(
+            self.make_env,
+            n_envs=1,
+            seed=seed,
+            wrapper_class=lambda env: apply_wrappers(env, self.config.gym_wrappers),
+            vec_env_cls=DummyVecEnv
+        )
+        eval_env = apply_wrappers(eval_env, self.config.sb3_wrappers)
 
         log_dir = make_run_dir(self.main_dir, self.exp_name)
         logger = configure(log_dir, ["stdout", "json", "tensorboard", "csv"])
@@ -123,7 +135,7 @@ class BaseExperiment(ABC):
             logger.output_formats.append(RedisWriter(trial))
             trial.storage.set_trial_user_attr(trial._trial_id, "meta-data", json_ready_meta_data)
 
-        agent, score = self._setup(hyperparameters, vecenv, logger, seed)
+        agent, score = self._setup(hyperparameters, vecenv, logger, seed, eval_env)
 
         if self.cl_args["save_model"]:
             agent.save(log_dir)

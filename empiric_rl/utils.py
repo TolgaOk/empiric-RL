@@ -72,8 +72,8 @@ def _realize_hyperparameter(collection: Dict[str, Union[Dict[str, HyperParameter
                             trial: Optional[optuna.Trial] = None,
                             realize_fn: Callable[[HyperParameter],
                                                  optuna.Trial] = _realize_by_sample
-                            ) -> Tuple[Dict[Union[Dict[str, Any]], Any],
-                                       Dict[Union[Dict[str, Any]], Any]]:
+                            ) -> Tuple[Dict[Dict[str, Any], Any],
+                                       Dict[Dict[str, Any], Any]]:
     realization_collection = dict()
     json_realization_collection = dict()
     for name, value in collection.items():
@@ -92,8 +92,8 @@ def realize_hyperparameters(collection: Dict[str, Union[Dict[str, HyperParameter
                             trial: Optional[optuna.Trial] = None,
                             n_repeat: int = 1,
                             start_with_default: bool = False
-                            ) -> Tuple[Dict[Union[Dict[str, Any]], Any],
-                                       Dict[Union[Dict[str, Any]], Any]]:
+                            ) -> Tuple[Dict[Dict[str, Any], Any],
+                                       Dict[Dict[str, Any], Any]]:
     if n_repeat > 1 and trial is None:
         raise ValueError("Trial is missing! Parameter n_repeat > 1 must be used in tune mode")
     realize_fn = _realize_by_sample

@@ -31,10 +31,11 @@ class SB3Experiment(BaseExperiment):
 
     @abstractmethod
     def _setup(self,
-               hyperparameters: Dict[Union[Dict[str, Any]], Any],
+               hyperparameters: Dict[Dict[str, Any], Any],
                vecenv: VecEnv,
                logger: Logger,
                seed: int,
+               eval_vecenv: VecEnv,
                ) -> Tuple[BaseAlgorithm, float]:
         pass
 

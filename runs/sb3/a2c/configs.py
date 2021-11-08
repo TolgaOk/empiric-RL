@@ -64,8 +64,6 @@ LunarLanderConfig = SB3Config(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=5,
-        n_trials=5,
-        n_procs=1,
         direction="maximize",
     )
 )
@@ -133,14 +131,12 @@ BipedalWalkerConfig = SB3Config(
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=10,
-        n_trials=100,
-        n_procs=1,
         direction="maximize",
     )
 )
 
 AtariConfig = SB3Config(
-    policy=SB3ConvActorCritic,
+    policy="CnnPolicy",
     hyperparameters=dict(
         lr=HyperParameter(
             default=7e-4,
@@ -169,67 +165,13 @@ AtariConfig = SB3Config(
         total_timesteps=HyperParameter(
             default=10000000,
             tune_fn=None),
-        policy_kwargs=dict(
-            pi_layer_widths=HyperParameter(
-                default=[512],
-                tune_fn=lambda trial: trial.suggest_categorical(
-                    "pi_layer_widths",
-                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
-                interpret=lambda choice: json.loads(choice)),
-            value_layer_widths=HyperParameter(
-                default=[512],
-                tune_fn=lambda trial: trial.suggest_categorical(
-                    "value_layer_widths",
-                    ["[128, 128]", "[64, 64, 64]", "[200, 300]", "[256, 256, 256]"]),
-                interpret=lambda choice: json.loads(choice)),
-            pi_activation_fn=HyperParameter(
-                default=torch.nn.ReLU,
-                tune_fn=lambda trial: trial.suggest_categorical(
-                    "pi_activation_fn",
-                    ["ELU", "Tanh", "ReLU"]),
-                interpret=lambda choice: getattr(torch.nn, choice)),
-            value_activation_fn=HyperParameter(
-                default=torch.nn.ReLU,
-                tune_fn=lambda trial: trial.suggest_categorical(
-                    "value_activation_fn",
-                    ["ELU", "Tanh", "ReLU"]),
-                interpret=lambda choice: getattr(torch.nn, choice)),
-            conv_net_kwargs=dict(
-                activation_fn=HyperParameter(
-                    default=torch.nn.ReLU,
-                    tune_fn=lambda trial: trial.suggest_categorical(
-                        "conv_activation_fn",
-                        ["ELU", "Tanh", "ReLU"]),
-                    interpret=lambda choice: getattr(torch.nn, choice)),
-                channel_depths=HyperParameter(
-                    default=[32, 64, 64],
-                    tune_fn=lambda trial: trial.suggest_categorical(
-                        "channel_depths",
-                        ["[64, 128, 128, 256, 512]", "[64, 128, 256, 512]",
-                         "[256, 256, 256, 256, 256]", "[64, 64, 64]"])),
-                kernel_size=HyperParameter(
-                    default=[8, 4, 3],
-                    tune_fn=None),
-                padding=HyperParameter(
-                    default=[0, 0, 0],
-                    tune_fn=None),
-                stride=HyperParameter(
-                    default=[4, 2, 1],
-                    tune_fn=None),
-                maxpool=HyperParameter(
-                    default=7,
-                    tune_fn=None),
-            )
-        )
     ),
-    gym_wrappers=[AtariWrapper],
-    sb3_wrappers=[lambda vecenv: VecFrameStack(vecenv, 4),
-                  VecTransposeImage],
+    gym_wrappers=[{"class": AtariWrapper, "kwargs": {}}],
+    sb3_wrappers=[{"class": VecFrameStack, "kwargs": {"n_stack": 4}},
+                  {"class": VecTransposeImage, "kwargs": {}}],
     tuner=TunerInfo(
         sampler_cls=optuna.samplers.TPESampler,
         n_startup_trials=10,
-        n_trials=100,
-        n_procs=1,
         direction="maximize",
     )
 )

@@ -14,10 +14,11 @@ from empiric_rl.trainers.sb3_trainer import SB3Experiment
 class A2CExperiment(SB3Experiment):
 
     def _setup(self,
-               hyperparameters: Dict[Union[Dict[str, Any]], Any],
+               hyperparameters: Dict[Dict[str, Any], Any],
                vecenv: VecEnv,
                logger: Logger,
-               seed: int
+               seed: int,
+               eval_vecenv: VecEnv
                ) -> Tuple[BaseAlgorithm, float]:
         agent = A2C(
             policy=self.config.policy,
@@ -29,12 +30,6 @@ class A2CExperiment(SB3Experiment):
             ent_coef=hyperparameters["ent_coef"],
             vf_coef=hyperparameters["vf_coef"],
             max_grad_norm=hyperparameters["max_grad_norm"],
-            use_rms_prop=False,
-            use_sde=False,
-            normalize_advantage=False,
-            tensorboard_log=None,
-            create_eval_env=False,
-            policy_kwargs=hyperparameters["policy_kwargs"],
             verbose=1,
             seed=seed,
             device=self.cl_args["device"],
@@ -45,9 +40,9 @@ class A2CExperiment(SB3Experiment):
             total_timesteps=hyperparameters["total_timesteps"],
             callback=None,
             log_interval=self.cl_args["log_interval"],
-            eval_env=None,
-            eval_freq=-1,
-            n_eval_episodes=0,
+            eval_env=eval_vecenv,
+            eval_freq=self.cl_args["log_interval"] * hyperparameters["n_steps"] * 10,
+            n_eval_episodes=4,
             tb_log_name=self.exp_name,
             eval_log_path=None,
         )

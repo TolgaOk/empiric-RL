@@ -13,7 +13,7 @@ from configs import all_configs
 
 class A2CExperiment(MBExperiment):
 
-    def _setup(self, hyperparameters, vecenv, logger, seed):
+    def _setup(self, hyperparameters, vecenv, logger, seed, eval_vecevn):
         np.random.seed(seed)
         torch.manual_seed(seed)
         policy = self.config.policy(observation_space=vecenv.observation_space,
