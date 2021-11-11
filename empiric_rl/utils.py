@@ -1,4 +1,5 @@
-from typing import Callable, Dict, NamedTuple, Any, Optional, List, Union, Tuple
+from dataclasses import dataclass
+from typing import Callable, Dict, Any, Optional, List, Union, Tuple
 import gym
 import os
 import json
@@ -10,7 +11,8 @@ from functools import partial
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvWrapper
 
 
-class HyperParameter(NamedTuple):
+@dataclass
+class HyperParameter():
     default: Any
     tune_fn: Optional[Callable] = None
     interpret: Optional[Callable] = None

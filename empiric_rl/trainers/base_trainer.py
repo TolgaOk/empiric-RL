@@ -10,6 +10,7 @@ import pickle
 import gym
 import json
 import socket
+import tempfile
 from optuna.trial import TrialState
 
 from stable_baselines3.common.env_util import make_atari_env, make_vec_env
@@ -70,12 +71,16 @@ class BaseExperiment(ABC):
         self.config = configs[env_class_name]
         self.exp_name = "_".join([exp_name_prefix, env_class_name])
         self.main_dir = cl_args["log_dir"]
+        if self.main_dir is None:
+            self.main_dir = tempfile.TemporaryDirectory().name
         if self.cl_args["tune"] is False:
             if self.cl_args["n_seeds"] > 1 or self.cl_args["start_tune_with_default_params"]:
                 raise ValueError("CL argumenents 'n-seeds' and 'start-tune-with-default-params'"
                                  " can only be used in tune mode")
         if self.cl_args["tune"]:
             self.main_dir = make_run_dir(self.main_dir, "Tune_"+self.exp_name)
+        
+        self._modify_default_params()
 
     @property
     def config_encoder_class(self):
@@ -99,6 +104,23 @@ class BaseExperiment(ABC):
 
     def make_env(self):
         return gym.make(self.cl_args["env_name"])
+
+    def _modify_default_params(self):
+        default_param_path = self.cl_args["default_parameter_path"]
+        if default_param_path is None:
+            return
+        with open(default_param_path, "r") as file:
+            defaults = json.load(file)
+
+        def modify(defaults_dict, hyperparameters_dict):
+            for key, value in defaults_dict.items():
+                if isinstance(value, dict):
+                    modify(value[key], hyperparameters_dict[key])
+                else:
+                    hyperparameters_dict[key].default = value
+        
+        modify(defaults, self.config.hyperparameters)
+        
 
     def setup(self, trial: Optional[optuna.Trial] = None) -> float:
         hyperparameters, jsonized_hyperparameters = realize_hyperparameters(
@@ -219,3 +241,5 @@ class BaseExperiment(ABC):
                                   "Default: Environment name"))
         parser.add_argument("--max-trials", type=int, default=1,
                             help="Set the maximum number of trials if a new study is created")
+        parser.add_argument("--default-parameter-path", type=str, default=None,
+                            help="Json file path of the default hyperparamters")
