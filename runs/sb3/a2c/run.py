@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3 import A2C
 
-from configs import all_configs
+from runs.sb3.a2c.configs import all_configs
 from empiric_rl.utils import log_weighted_average_score
 from empiric_rl.trainers.sb3_trainer import SB3Experiment
 
@@ -40,7 +40,7 @@ class A2CExperiment(SB3Experiment):
             total_timesteps=hyperparameters["total_timesteps"],
             callback=None,
             log_interval=self.cl_args["log_interval"],
-            eval_env=eval_vecenv,
+            eval_env=None,
             eval_freq=self.cl_args["log_interval"] * hyperparameters["n_steps"] * 10,
             n_eval_episodes=4,
             tb_log_name=self.exp_name,

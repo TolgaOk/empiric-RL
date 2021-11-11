@@ -8,7 +8,7 @@ from modular_baselines.loggers.basic import InitLogCallback, LogRolloutCallback,
 
 from empiric_rl.trainers.mb_trainer import MBExperiment
 from empiric_rl.utils import log_weighted_average_score
-from configs import all_configs
+from runs.mb.a2c.configs import all_configs
 
 
 class A2CExperiment(MBExperiment):

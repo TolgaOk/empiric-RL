@@ -1,4 +1,5 @@
 from typing import List, Union, Optional, Tuple, Dict, Any
+import os
 import numpy as np
 from gym.spaces import Discrete, Box
 import torch
@@ -72,6 +73,15 @@ class MBDenseActorCritic(BaseDenseActorCritic, TorchA2CPolicy):
             action = action.unsqueeze(-1)
         return action.cpu().numpy(), None, {}
 
+    def save(self, path: str) -> None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        torch.save(
+            dict(
+                modules=self.state_dict(),
+                optim=self.optimizer.state_dict()
+            ),
+            path)
+
 
 class MBConvActorCritic(MBDenseActorCritic):
 
@@ -88,8 +98,8 @@ class MBConvActorCritic(MBDenseActorCritic):
         if observation_space.shape[-3] > 4:
             warnings.warn("Expected channel axis is [-3]")
         feature_obs_space = Box(low=-np.inf, high=np.inf,
-                                  shape=(conv_net_kwargs["maxpool"]**2 *
-                                         conv_net_kwargs["channel_depths"][-1],))
+                                shape=(conv_net_kwargs["maxpool"]**2 *
+                                       conv_net_kwargs["channel_depths"][-1],))
         super().__init__(feature_obs_space,
                          action_space,
                          lr,
@@ -115,7 +125,7 @@ class MBConvActorCritic(MBDenseActorCritic):
                          last_next_obs_img: torch.Tensor,
                          ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         concat_obs = torch.cat([self.conv_net.pre_process(obs_image),
-                       self.conv_net.pre_process(last_next_obs_img).unsqueeze(1)], dim=1)
+                                self.conv_net.pre_process(last_next_obs_img).unsqueeze(1)], dim=1)
         batch_shape = concat_obs.shape[:2]
         concat_obs = concat_obs.reshape(np.product(batch_shape), *concat_obs.shape[2:])
         concat_features = self.conv_net(concat_obs)
@@ -127,5 +137,3 @@ class MBConvActorCritic(MBDenseActorCritic):
                                         policy_state,
                                         action,
                                         last_next_feature)
-
-    
