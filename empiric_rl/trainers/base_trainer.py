@@ -65,8 +65,10 @@ class BaseExperiment(ABC):
     def __init__(self,
                  configs: BaseConfig,
                  cl_args: Dict[str, Any],
-                 exp_name_prefix: Optional[str] = "",):
+                 exp_name_prefix: Optional[str] = "",
+                 max_retry_after_fail: int = 1):
         self.cl_args = cl_args
+        self.max_retry_after_fail = max_retry_after_fail
         env_class_name = self.make_env().env.__class__.__name__
         self.config = configs[env_class_name]
         self.exp_name = "_".join([exp_name_prefix, env_class_name])
@@ -79,7 +81,7 @@ class BaseExperiment(ABC):
                                  " can only be used in tune mode")
         if self.cl_args["tune"]:
             self.main_dir = make_run_dir(self.main_dir, "Tune_"+self.exp_name)
-        
+
         self._modify_default_params()
 
     @property
@@ -118,9 +120,8 @@ class BaseExperiment(ABC):
                     modify(value[key], hyperparameters_dict[key])
                 else:
                     hyperparameters_dict[key].default = value
-        
+
         modify(defaults, self.config.hyperparameters)
-        
 
     def setup(self, trial: Optional[optuna.Trial] = None) -> float:
         hyperparameters, jsonized_hyperparameters = realize_hyperparameters(
@@ -130,9 +131,9 @@ class BaseExperiment(ABC):
             start_with_default=self.cl_args["start_tune_with_default_params"])
         seed = self.make_seed(self.cl_args["seed"], trial)
         json_ready_meta_data = dict(commandline_args=self.cl_args,
-                                        config=self.config_encoder_class.encode(
-                                            self.config, jsonized_hyperparameters, seed),
-                                        local_ip_adress=self.get_local_ip())
+                                    config=self.config_encoder_class.encode(
+                                        self.config, jsonized_hyperparameters, seed),
+                                    local_ip_adress=self.get_local_ip())
 
         vecenv = make_vec_env(
             self.make_env,
@@ -199,20 +200,27 @@ class BaseExperiment(ABC):
         return socket_obj.getsockname()[0]
 
     def optimize_study(self, study: optuna.Study, n_trials: int):
-        if len(study.trials) >= n_trials:
-            warnings.warn("Study: {} has already {} >= {} many trials".format(
-                study.study_name, len(study.trials), n_trials))
-        while len(study.trials) < n_trials:
+        n_failed_trails = len([trial for trial in study.trials
+                                if trial.state == optuna.trial.TrialState.FAIL])
+        n_total_trials = len(study.trials)
+        if (n_total_trials - n_failed_trails) >= n_trials:
+            warnings.warn("Study: {} has already {} >= {} many unfailed trials".format(
+                study.study_name, n_total_trials - n_failed_trails, n_trials))
+        n_failed_attempt = 0
+        while (len(study.trials) - (n_failed_trails + n_failed_attempt)) < n_trials:
             trial = study.ask()
             try:
-                if trial.number > n_trials:
+                if trial.number - (n_failed_trails + n_failed_attempt) > n_trials:
                     study.tell(trial, None, state=TrialState.FAIL)
                 else:
                     score = self.setup(trial)
                     study.tell(trial, score, state=TrialState.COMPLETE)
             except:
                 study.tell(trial, None, state=TrialState.FAIL)
+                n_failed_attempt += 1
                 raise
+            if n_failed_attempt >= self.max_retry_after_fail:
+                break
 
     @staticmethod
     def add_parse_arguments(parser: argparse.ArgumentParser) -> None:
