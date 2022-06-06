@@ -68,7 +68,6 @@ LunarLanderConfig = SB3Config(
     )
 )
 
-# tuned with log score of 147.5278713145453
 BipedalWalkerConfig = SB3Config(
     policy=SB3DenseActorCritic,
     hyperparameters=dict(
