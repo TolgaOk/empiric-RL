@@ -1,6 +1,5 @@
 from typing import Optional
 from itertools import chain
-from collections import defaultdict
 import numpy as np
 from scipy import stats
 import optuna
@@ -77,6 +76,7 @@ def plot_trials(study: optuna.Study):
         template="plotly_white",
     )
     return fig
+
 
 def make_hover_text(trial):
     return "<br>".join(["<b>{}</b>: {}".format(key, value)
@@ -202,3 +202,6 @@ def uniform(sample, low, high, name, bins=10, use_log=False):
         )
 
     return fig
+
+
+
