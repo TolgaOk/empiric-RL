@@ -18,11 +18,11 @@ Benchmarking package of common Reinforcement Learning (RL) environments with sta
 
 EmpiricRL uses [Optuna](https://optuna.org/) for hyperparameters search and optimization in a distributed setting. Additionally, EmpricRL offers ready to use examples for [Stable Baselines 3](https://github.com/DLR-RM/stable-baselines3) and [ModularBaselines](https://github.com/TolgaOk/Modular-Baselines).
 
-![Figure](distributed-tune.png "EmpiricRL Notebook Widget")
+![Figure](docs/distributed-tune.png "EmpiricRL Notebook Widget")
 
 Widgets connect to a Redis server and render the studies in the server for live visualization.    
 
-![Figure](widget-plotting.png "Plotting and Logging")
+![Figure](docs/widget-plotting.png "Plotting and Logging")
 
 Different trials can be combined within a single figure. IF the trials are identical but the seed, the notebook widget combines them in a single trace with shaded regions. The y and x-axes can be selected separately.
 
